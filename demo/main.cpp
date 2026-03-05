@@ -1,6 +1,6 @@
 /**
  * 时序模块小 demo：多线程往 TickQueue push，单线程池顺序消费并更新 TickState。
- * 验证：多生产者-单消费者、step_id 单调、result 按序累加。
+ * TickQueue 内部为按 step_id 的小根堆，故无论 push 顺序如何，消费者始终按 step_id 从小到大取到，result 为全量累加。
  */
 #include "../singlethreadpool.h"  // 已含 tick_processor.h
 #include <iostream>

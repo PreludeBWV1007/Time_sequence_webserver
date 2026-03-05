@@ -47,15 +47,22 @@ private:
     int step_id;
 };
 
-/** 有界阻塞队列，多生产者-单消费者（MPSC）。
- * 多个线程可并发调用 push（会轮流抢锁，互斥入队）；只有单线程应调用 wait_and_pop（如 singlethreadpool 的工作线程）。
- * 锁不禁止“多 push”，而是保证同一时刻只有一个线程在操作 queue，避免竞态。 */
+/** 小根堆比较器：step_id 小的优先（堆顶为当前最小 step_id）。 */
+struct TickDataCmp {
+    bool operator()(const TickData& a, const TickData& b) const {
+        return a.getStepId() > b.getStepId();
+    }
+};
+
+/** 有界阻塞优先队列（按 step_id 小根堆），多生产者-单消费者（MPSC）。
+ * 多线程可乱序 push；wait_and_pop 始终取出当前堆中 step_id 最小的那条，故消费者得到的是按 step_id 递增的序列（可能缺号）。
+ * 用于在“线程池乱序入队”时仍保证下游按序处理，且某步永久不到时不会阻塞后续步。 */
 class TickQueue {
 public:
     explicit TickQueue(size_t max_size = 1000);
     ~TickQueue();
     bool push(const TickData& tick_data);
-    /** 取出一条数据；若队列已关闭且为空则返回 false，否则取出并返回 true。 */
+    /** 取出当前 step_id 最小的一条；若队列已关闭且为空则返回 false，否则取出并返回 true。 */
     bool wait_and_pop(TickData& out);
     bool try_pop(TickData& out);
     size_t size() const;
@@ -63,7 +70,7 @@ public:
     void set_stop();
 
 private:
-    std::queue<TickData> queue;
+    std::priority_queue<TickData, std::vector<TickData>, TickDataCmp> queue;
     mutable locker queue_locker;  // mutable：size() 为 const 成员，但需在内部加锁读 queue
     cond queue_cond;              // 队列空时 wait_and_pop 在此等待；push 后 signal 唤醒
     bool stop = false;

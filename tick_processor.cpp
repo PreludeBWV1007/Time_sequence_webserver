@@ -50,7 +50,7 @@ bool TickQueue::try_pop(TickData& out) {
         queue_locker.unlock();
         return false;
     }
-    out = queue.front();
+    out = queue.top();
     queue.pop();
     queue_locker.unlock();
     return true;
@@ -80,7 +80,7 @@ bool TickQueue::wait_and_pop(TickData& out) {
         queue_locker.unlock();
         return false;
     }
-    out = queue.front();
+    out = queue.top();
     queue.pop();
     queue_locker.unlock();
     return true;
