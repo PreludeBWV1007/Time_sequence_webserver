@@ -51,3 +51,18 @@ make demo_sin
 
 - **[ordered push]**：单生产者按 1..100 顺序 push，消费者按序取，got≈0 → PASS。
 - **[disordered push, consumer after]**：先按随机顺序 push 全部 100 条，再启动消费者；堆内已满，弹出顺序为 1..100，got≈0 → PASS，验证小根堆重排有效。
+
+---
+
+## 3. send_ticks_concurrent.py：HTTP 高并发发送（按步等待、不丢步）
+
+- **协议**：先发起始时间点 `step=0` 并等待约 0.5s，再并发发 `step=1..100`，保证 0 先入队，前面的数据不丢。
+- **消费者**：使用 `wait_and_pop_if_step(out, expected_step)`，仅当堆顶的 step_id 等于“下一步”时才 pop 并处理，否则阻塞；无手动 sleep，靠“等堆顶为下一步”的逻辑延时。
+- **状态**：`TickState` 初始 `step_id = -1`，下一期望步为 0；处理为 `value*2`，在 `/state` 按序显示。
+
+```bash
+# 先启动服务器，例如: ./server 8080
+python3 send_ticks_concurrent.py http://127.0.0.1:8080
+```
+
+预期：打开 `/state` 可见 step 0..100 按序（0: 0, 1: 20, 2: 40, …, 100: 2000）。

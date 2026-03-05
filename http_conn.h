@@ -26,7 +26,7 @@ class http_conn
 public:
     static const int FILENAME_LEN = 200;        // 文件名的最大长度
     static const int READ_BUFFER_SIZE = 2048;   // 读缓冲区的大小
-    static const int WRITE_BUFFER_SIZE = 1024;  // 写缓冲区的大小
+    static const int WRITE_BUFFER_SIZE = 10240; // 写缓冲区的大小（需容纳 /state 按序显示等较长响应）
     
     // HTTP请求方法，这里只支持GET
     enum METHOD {GET = 0, POST, HEAD, PUT, DELETE, TRACE, OPTIONS, CONNECT};

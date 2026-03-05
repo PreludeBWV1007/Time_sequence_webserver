@@ -34,8 +34,9 @@ void singlethreadpool::run() {
     if (!m_queue || !m_state || !heavy_compute)
         return;
     while (!stop) {
+        int next_expected = m_state->getStepId() + 1;  // 仅当堆顶为下一步时才消费，否则阻塞让堆中积累数据
         TickData tick_data;
-        if (!m_queue->wait_and_pop(tick_data))  // 唯一调用 wait_and_pop 的线程，即“单 pop”
+        if (!m_queue->wait_and_pop_if_step(tick_data, next_expected))
             break;
         double old_result = m_state->getResult();
         heavy_compute(old_result, tick_data);   // 回调里应做 state.update(tick_data, new_result)

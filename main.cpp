@@ -44,14 +44,15 @@ int main( int argc, char* argv[] ) {
     int port = atoi( argv[1] );
     addsig( SIGPIPE, SIG_IGN ); // 向已关闭的 socket 写数据时，默认会终止进程。高并发服务器通常都会忽略 SIGPIPE，避免偶发客户端断开导致整个进程退出。
 
-    // 时序模块：全局队列与状态，供 /tick、/state 使用；单线程池顺序消费并累加
+    // 时序模块：全局队列与状态，供 /tick、/state 使用；单线程池按 step_id 顺序消费，处理为 value*2 并按序记录
     TickQueue tick_queue(256);
     TickState tick_state;
     g_tick_queue = &tick_queue;
     g_tick_state = &tick_state;
-    auto on_tick = [&tick_state](double old_result, const TickData& td) {
-        double new_result = old_result + td.getValue();
-        tick_state.update(td, new_result);
+    auto on_tick = [&tick_state](double /*old_result*/, const TickData& td) {
+        double processed = td.getValue() * 2.0;
+        if ( tick_state.update(td, processed) )
+            tick_state.appendDisplay(td.getStepId(), processed);
     };
     singlethreadpool tick_pool(tick_queue, tick_state, on_tick);
 

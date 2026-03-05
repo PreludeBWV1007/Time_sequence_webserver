@@ -2,6 +2,8 @@
 #include "tick_processor.h"
 #include "tick_server.h"
 #include <stdlib.h>
+#include <string>
+#include <cstring>
 
 // 定义HTTP响应的一些状态信息
 const char* ok_200_title = "OK";
@@ -315,7 +317,7 @@ http_conn::HTTP_CODE http_conn::process_read() {
 // 在 process_read() 判定“请求完整”后被调用，作用是把 URL 映射到本地文件，检查文件是否可用，然后把文件 mmap 到内存，为后续 writev 发送做准备。
 http_conn::HTTP_CODE http_conn::do_request()
 {
-    // 时序接口：/state 返回当前 step_id、result；/tick 或 /tick?value= 入队一条时序数据
+    // 时序接口：/state 返回当前 step_id、result 与按序处理结果；/tick?step=&value= 入队，step 为客户端时序
     if ( m_url && strcmp( m_url, "/state" ) == 0 ) {
         return STATE_REQUEST;
     }
@@ -324,7 +326,12 @@ http_conn::HTTP_CODE http_conn::do_request()
         const char* val_str = strstr( m_url, "value=" );
         if ( val_str )
             value = atof( val_str + 6 );
-        int step = g_tick_step_id++;
+        int step = 0;
+        const char* step_str = strstr( m_url, "step=" );
+        if ( step_str )
+            step = atoi( step_str + 5 );
+        if ( !step_str || step < 0 )  // 未传 step 或非法（负值）：退化为服务器自增序号；step=0 为合法起始步
+            step = g_tick_step_id++;
         if ( g_tick_queue )
             g_tick_queue->push( TickData( value, step ) );
         return TICK_REQUEST;
@@ -549,15 +556,24 @@ bool http_conn::process_write(HTTP_CODE ret) {
         case STATE_REQUEST: {
             int sid = g_tick_state ? g_tick_state->getStepId() : 0;
             double r = g_tick_state ? g_tick_state->getResult() : 0.0;
-            char buf[512];
-            int len = snprintf( buf, sizeof(buf),
-                "<!DOCTYPE html><html><head><meta charset='utf-8'><title>State</title></head>"
-                "<body><p>step_id: %d</p><p>result: %f</p><p><a href='/state'>刷新</a></p></body></html>",
-                sid, r );
-            if ( len <= 0 || len >= (int)sizeof(buf) ) len = 0;
+            std::string disp = g_tick_state ? g_tick_state->getDisplay() : "";
+            char body_buf[8192];
+            const char* pre = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>State</title></head><body><p>step_id: %d</p><p>result: %f</p><pre>";
+            const char* suf = "</pre><p><a href='/state'>刷新</a></p></body></html>";
+            int n = snprintf( body_buf, sizeof(body_buf), pre, sid, r );
+            if ( n > 0 && n < (int)sizeof(body_buf) ) {
+                size_t avail = sizeof(body_buf) - (size_t)n - strlen(suf) - 1;
+                size_t copy_len = disp.size() < avail ? disp.size() : avail;
+                if ( copy_len > 0 )
+                    memcpy( body_buf + n, disp.c_str(), copy_len );
+                n += (int)copy_len;
+                body_buf[n] = '\0';
+                strncat( body_buf, suf, sizeof(body_buf) - (size_t)n - 1 );
+            }
+            int len = (int)strlen( body_buf );
             add_status_line( 200, ok_200_title );
             add_headers( len );
-            if ( len > 0 && ! add_content( buf ) ) return false;
+            if ( len > 0 && ! add_content( body_buf ) ) return false;
             break;
         }
         case FILE_REQUEST:

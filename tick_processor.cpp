@@ -1,5 +1,6 @@
 #include "tick_processor.h"
 #include <cmath>
+#include <cstdio>
 #include <thread>
 #include <chrono>
 
@@ -44,6 +45,22 @@ double TickState::getResult() const {
     return result;
 }
 
+void TickState::appendDisplay(int step_id, double processed_value) {
+    m_display_locker.lock();
+    char line[64];
+    int n = snprintf(line, sizeof(line), "%d: %.6f\n", step_id, processed_value);
+    if (n > 0 && n < (int)sizeof(line))
+        m_display.append(line);
+    m_display_locker.unlock();
+}
+
+std::string TickState::getDisplay() const {
+    m_display_locker.lock();
+    std::string copy = m_display;
+    m_display_locker.unlock();
+    return copy;
+}
+
 bool TickQueue::try_pop(TickData& out) {
     queue_locker.lock();
     if (queue.empty()) {
@@ -69,7 +86,22 @@ void TickQueue::set_stop() {
     queue_locker.unlock();
 }
 
-// 调用方：只有 singlethreadpool::run() 会调本函数，即“单 pop”的入口在 singlethreadpool.cpp，不在此文件。当singlethreadpool被构造时，会有pthread_create(..., worker, this) 起一个工作线程，该线程执行 worker() → pool->run()。该线程会一直循环 wait_and_pop，直到 stop 被设置为 true。
+// 仅当堆顶 step_id == expected_step 时才 pop，否则阻塞；每次 push 会 signal，消费者被唤醒后重新检查堆顶，实现“等下一步到位”的阻塞，不丢步。
+bool TickQueue::wait_and_pop_if_step(TickData& out, int expected_step) {
+    queue_locker.lock();
+    while (!stop && (queue.empty() || queue.top().getStepId() != expected_step)) {
+        queue_cond.wait(queue_locker.get());
+    }
+    if (stop) {
+        queue_locker.unlock();
+        return false;
+    }
+    out = queue.top();
+    queue.pop();
+    queue_locker.unlock();
+    return true;
+}
+
 bool TickQueue::wait_and_pop(TickData& out) {
     queue_locker.lock();   // 若锁被 push/其他线程占用则当前线程阻塞，直到拿到锁
     while (queue.empty() && !stop) {
