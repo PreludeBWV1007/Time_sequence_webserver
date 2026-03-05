@@ -50,10 +50,12 @@ public:
         FILE_REQUEST        :   文件请求,获取文件成功
         INTERNAL_ERROR      :   表示服务器内部错误
         CLOSED_CONNECTION   :   表示客户端已经关闭连接了
+        TICK_REQUEST        :   时序请求 /tick，已入队
+        STATE_REQUEST       :   查询当前时序状态 /state
     */
 
     // 解析结果状态机：成功、失败、需要继续等待...
-    enum HTTP_CODE { NO_REQUEST, GET_REQUEST, BAD_REQUEST, NO_RESOURCE, FORBIDDEN_REQUEST, FILE_REQUEST, INTERNAL_ERROR, CLOSED_CONNECTION };
+    enum HTTP_CODE { NO_REQUEST, GET_REQUEST, BAD_REQUEST, NO_RESOURCE, FORBIDDEN_REQUEST, FILE_REQUEST, INTERNAL_ERROR, CLOSED_CONNECTION, TICK_REQUEST, STATE_REQUEST };
     
     // 从状态机:三个状态，来判断当前行是否完整
     // 1.读取到一个完整的行 2.行出错 3.行数据尚且不完整

@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -pthread
 TARGET = server
 
-SRCS = main.cpp http_conn.cpp
+SRCS = main.cpp http_conn.cpp tick_processor.cpp singlethreadpool.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 .PHONY: all clean

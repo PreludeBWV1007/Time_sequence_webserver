@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>发送时序信号</title>
+</head>
+<body>
+    <h1>时序信号客户端</h1>
+    <p>点击按钮向服务器发送一条时序数据（value=1.0），可在另一标签页打开 <a href="/state" target="_blank">/state</a> 查看当前 step_id 和 result 并刷新。</p>
+    <button id="send">发送 /tick?value=1.0</button>
+    <p id="msg"></p>
+    <script>
+        document.getElementById('send').onclick = function() {
+            var msg = document.getElementById('msg');
+            msg.textContent = '发送中...';
+            fetch(window.location.origin + '/tick?value=1.0')
+                .then(function(r) { return r.text(); })
+                .then(function(t) { msg.textContent = '已发送，响应: ' + t.trim(); })
+                .catch(function(e) { msg.textContent = '错误: ' + e; });
+        };
+    </script>
+</body>
+</html>

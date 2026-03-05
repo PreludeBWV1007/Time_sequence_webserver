@@ -1,4 +1,7 @@
 #include "http_conn.h"
+#include "tick_processor.h"
+#include "tick_server.h"
+#include <stdlib.h>
 
 // 定义HTTP响应的一些状态信息
 const char* ok_200_title = "OK";
@@ -312,6 +315,21 @@ http_conn::HTTP_CODE http_conn::process_read() {
 // 在 process_read() 判定“请求完整”后被调用，作用是把 URL 映射到本地文件，检查文件是否可用，然后把文件 mmap 到内存，为后续 writev 发送做准备。
 http_conn::HTTP_CODE http_conn::do_request()
 {
+    // 时序接口：/state 返回当前 step_id、result；/tick 或 /tick?value= 入队一条时序数据
+    if ( m_url && strcmp( m_url, "/state" ) == 0 ) {
+        return STATE_REQUEST;
+    }
+    if ( m_url && strncmp( m_url, "/tick", 5 ) == 0 ) {
+        double value = 1.0;
+        const char* val_str = strstr( m_url, "value=" );
+        if ( val_str )
+            value = atof( val_str + 6 );
+        int step = g_tick_step_id++;
+        if ( g_tick_queue )
+            g_tick_queue->push( TickData( value, step ) );
+        return TICK_REQUEST;
+    }
+
     // "/home/nowcoder/webserver/resources"
     strcpy( m_real_file, doc_root ); // 拼出真实文件路径：doc_root + m_url
     int len = strlen( doc_root );
@@ -521,6 +539,27 @@ bool http_conn::process_write(HTTP_CODE ret) {
                 return false;
             }
             break;
+        case TICK_REQUEST: {
+            const char* body = "OK\n";
+            add_status_line( 200, ok_200_title );
+            add_headers( (int)strlen( body ) );
+            if ( ! add_content( body ) ) return false;
+            break;
+        }
+        case STATE_REQUEST: {
+            int sid = g_tick_state ? g_tick_state->getStepId() : 0;
+            double r = g_tick_state ? g_tick_state->getResult() : 0.0;
+            char buf[512];
+            int len = snprintf( buf, sizeof(buf),
+                "<!DOCTYPE html><html><head><meta charset='utf-8'><title>State</title></head>"
+                "<body><p>step_id: %d</p><p>result: %f</p><p><a href='/state'>刷新</a></p></body></html>",
+                sid, r );
+            if ( len <= 0 || len >= (int)sizeof(buf) ) len = 0;
+            add_status_line( 200, ok_200_title );
+            add_headers( len );
+            if ( len > 0 && ! add_content( buf ) ) return false;
+            break;
+        }
         case FILE_REQUEST:
             add_status_line(200, ok_200_title );
             add_headers(m_file_stat.st_size);

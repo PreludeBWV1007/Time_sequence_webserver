@@ -1,3 +1,6 @@
+#ifndef TICK_PROCESSOR_H
+#define TICK_PROCESSOR_H
+
 #include <queue>
 #include <thread>
 #include <mutex>
@@ -76,3 +79,5 @@ private:
     bool stop = false;
     size_t max_size;
 };
+
+#endif

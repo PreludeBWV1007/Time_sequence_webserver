@@ -11,6 +11,13 @@
 #include "locker.h"
 #include "threadpool.h"
 #include "http_conn.h"
+#include "tick_processor.h"
+#include "singlethreadpool.h"
+#include "tick_server.h"
+
+TickQueue* g_tick_queue = nullptr;
+TickState* g_tick_state = nullptr;
+std::atomic<int> g_tick_step_id(1);
 
 #define MAX_FD 65536   // 最大的文件描述符个数
 #define MAX_EVENT_NUMBER 10000  // 监听的最大的事件数量，epoll_wait最多返回的事件数
@@ -36,6 +43,17 @@ int main( int argc, char* argv[] ) {
 
     int port = atoi( argv[1] );
     addsig( SIGPIPE, SIG_IGN ); // 向已关闭的 socket 写数据时，默认会终止进程。高并发服务器通常都会忽略 SIGPIPE，避免偶发客户端断开导致整个进程退出。
+
+    // 时序模块：全局队列与状态，供 /tick、/state 使用；单线程池顺序消费并累加
+    TickQueue tick_queue(256);
+    TickState tick_state;
+    g_tick_queue = &tick_queue;
+    g_tick_state = &tick_state;
+    auto on_tick = [&tick_state](double old_result, const TickData& td) {
+        double new_result = old_result + td.getValue();
+        tick_state.update(td, new_result);
+    };
+    singlethreadpool tick_pool(tick_queue, tick_state, on_tick);
 
     threadpool< http_conn >* pool = NULL; // pool是线程池指针，指向一个threadpool<http_conn>对象
     try {
