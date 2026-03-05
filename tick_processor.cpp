@@ -27,7 +27,7 @@ double heavy_compute(const TickData& tick_data, double old_result) {
 
 bool TickState::update(const TickData& tick_data, double new_result) {
     state_locker.lock();
-    if (tick_data.getStepId() <= step_id) {
+    if (tick_data.getStepId() <= step_id) {  // 拒绝乱序或重复：只接受步序更大的更新
         state_locker.unlock();
         return false;
     }
@@ -56,6 +56,9 @@ bool TickQueue::try_pop(TickData& out) {
     return true;
 }
 
+// 以下：push / wait_and_pop 都先加同一把 queue_locker，故同一时刻只有一个线程在改 queue。
+// “多 push”= 多个线程都可调 push，但会轮流抢锁；“单 pop”= 只有 singlethreadpool 那一个工作线程在调 wait_and_pop。
+
 TickQueue::TickQueue(size_t max_cap) : stop(false), max_size(max_cap) {}
 TickQueue::~TickQueue() { set_stop(); }
 
@@ -66,10 +69,12 @@ void TickQueue::set_stop() {
     queue_locker.unlock();
 }
 
+// 调用方：只有 singlethreadpool::run() 会调本函数，即“单 pop”的入口在 singlethreadpool.cpp，不在此文件。当singlethreadpool被构造时，会有pthread_create(..., worker, this) 起一个工作线程，该线程执行 worker() → pool->run()。该线程会一直循环 wait_and_pop，直到 stop 被设置为 true。
 bool TickQueue::wait_and_pop(TickData& out) {
-    queue_locker.lock();
+    queue_locker.lock();   // 若锁被 push/其他线程占用则当前线程阻塞，直到拿到锁
     while (queue.empty() && !stop) {
-        queue_cond.wait(queue_locker.get());
+        // get() 只把互斥量指针传给 cond，不负责加锁。
+        queue_cond.wait(queue_locker.get()); // wait() 语义：先释放锁、再睡眠；被 signal 唤醒后重新抢锁再返回。
     }
     if (stop && queue.empty()) {
         queue_locker.unlock();
@@ -88,7 +93,7 @@ bool TickQueue::push(const TickData& tick_data) {
         return false;
     }
     queue.push(tick_data);
-    queue_cond.signal();
+    queue_cond.signal();  // 若有线程在 wait_and_pop 里等，唤醒一个
     queue_locker.unlock();
     return true;
 }

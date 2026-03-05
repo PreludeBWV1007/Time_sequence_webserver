@@ -78,7 +78,7 @@ void http_conn::init(int sockfd, const sockaddr_in& addr){
     m_address = addr;
     
     // 端口复用
-    int reuse = 1;
+    int reuse = 1; // 对 accept 得到的连接套接字 再设 SO_REUSEADDR，一般没有和 listenfd 同样的必要性，真正关键的是 listenfd 上的那一次。
     setsockopt( m_sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof( reuse ) ); // setsockopt：设置套接字选项, SOL_SOCKET：套接字选项所在的协议层, SO_REUSEADDR：允许重用本地地址
     addfd( m_epollfd, sockfd, true );
     m_user_count++;

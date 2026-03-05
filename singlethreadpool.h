@@ -5,6 +5,8 @@
 #include <pthread.h>
 #include <functional>
 
+/** 单工作线程池：唯一的工作线程循环 wait_and_pop → getResult → heavy_compute(old, tick_data)。
+ *  即 TickQueue 的“单消费者”；heavy_compute 回调内应调用 state.update(tick_data, new_result)。 */
 class singlethreadpool {
 public:
     singlethreadpool();

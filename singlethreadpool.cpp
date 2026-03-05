@@ -35,9 +35,9 @@ void singlethreadpool::run() {
         return;
     while (!stop) {
         TickData tick_data;
-        if (!m_queue->wait_and_pop(tick_data))
+        if (!m_queue->wait_and_pop(tick_data))  // 唯一调用 wait_and_pop 的线程，即“单 pop”
             break;
         double old_result = m_state->getResult();
-        heavy_compute(old_result, tick_data);
+        heavy_compute(old_result, tick_data);   // 回调里应做 state.update(tick_data, new_result)
     }
 }

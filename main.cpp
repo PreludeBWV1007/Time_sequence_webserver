@@ -56,6 +56,9 @@ int main( int argc, char* argv[] ) {
 
     // 端口复用
     int reuse = 1; // reuse是端口复用标志，1：启用端口复用，0：禁用端口复用
+    // 当某个地址（IP:端口）在刚被释放、还处在 TIME_WAIT 时，默认不允许马上再 bind 到同一地址，会报 “Address already in use”。
+    // 打开 SO_REUSEADDR 后，内核允许你在同一地址还在 TIME_WAIT 时再次 bind，也就是：服务器重启后，可以立刻重新占用同一个端口，不用等 1～4 分钟。
+    // listenfd（main.cpp 里），设 SO_REUSEADDR 是为了服务器重启时能马上再 bind 同一端口。否则在 TCP TIME_WAIT 期间，端口仍被视为“已占用”，bind 会失败。对监听套接字这是常规做法。
     setsockopt( listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof( reuse ) ); // setsockopt：设置套接字选项, SOL_SOCKET：套接字选项所在的协议层, SO_REUSEADDR：允许重用本地地址
     ret = bind( listenfd, ( struct sockaddr* )&address, sizeof( address ) );
     ret = listen( listenfd, 5 );
