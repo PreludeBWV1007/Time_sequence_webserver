@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时序信号 · 生成与发送</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background: #f5f5f7; color: #1d1d1f; min-height: 100vh; }
+        .page { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+        h1 { font-size: 28px; font-weight: 600; margin: 0 0 24px; letter-spacing: -0.5px; }
+        .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .btn { padding: 10px 20px; font-size: 14px; font-weight: 500; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #0071e3; color: #fff; }
+        .btn-primary:hover { background: #0077ed; }
+        .btn-primary:disabled { background: #c7c7cc; cursor: not-allowed; }
+        .btn-ghost { background: #fff; color: #0071e3; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .btn-ghost:hover { background: #f0f0f2; }
+        .toolbar label { font-size: 14px; color: #86868b; }
+        .toolbar input[type="number"] { width: 56px; padding: 8px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 14px; }
+        .status { font-size: 13px; color: #86868b; margin: 0 0 20px; min-height: 20px; }
+        .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+        #signalChart { max-width: 100%; height: 320px; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <h1>时序信号生成与发送</h1>
+        <div class="toolbar">
+            <button id="gen" class="btn btn-primary">生成信号</button>
+            <label>并发数 <input type="number" id="concurrency" value="5" min="1" max="20"></label>
+            <button id="send" class="btn btn-primary" disabled>发送</button>
+            <a href="/state" target="_blank" class="btn btn-ghost">查看 /state</a>
+        </div>
+        <p class="status" id="status"></p>
+        <div class="card">
+            <canvas id="signalChart" width="900" height="320"></canvas>
+        </div>
+    </div>
+    <script>
+        var chart = null;
+        var signalData = null;
+
+        function setStatus(s) { document.getElementById('status').textContent = s; }
+
+        document.getElementById('gen').onclick = function() {
+            var points = [];
+            var base = 500;
+            var volatility = 28;
+            var minVal = 80;
+            var maxVal = 920;
+            points.push({ step: 0, value: base });
+            for (var i = 1; i <= 100; i++) {
+                var delta = (Math.random() * 2 - 1) * volatility;
+                base = Math.max(minVal, Math.min(maxVal, base + delta));
+                points.push({ step: i, value: Math.round(base * 100) / 100 });
+            }
+            signalData = points;
+            setStatus('已生成 101 点（随机游走，类似股价走势）');
+            document.getElementById('send').disabled = false;
+
+            var labels = points.map(function(p) { return p.step; });
+            var values = points.map(function(p) { return p.value; });
+            var ctx = document.getElementById('signalChart').getContext('2d');
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: '信号', data: values, borderColor: '#34c759', fill: false, tension: 0.1 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false } } }
+            });
+        };
+
+        function shuffle(arr) {
+            for (var i = arr.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+            }
+            return arr;
+        }
+
+        document.getElementById('send').onclick = function() {
+            if (!signalData || signalData.length === 0) return;
+            var concurrency = parseInt(document.getElementById('concurrency').value, 10) || 5;
+            concurrency = Math.max(1, Math.min(20, concurrency));
+            setStatus('发送中（先 step=0，再乱序并发 step=1..100）...');
+
+            var base = window.location.origin;
+            var rest = signalData.slice(1);
+            shuffle(rest);
+
+            function sendOne(step, value) {
+                return fetch(base + '/tick?step=' + step + '&value=' + value).then(function(r) { return r.text(); });
+            }
+
+            sendOne(0, signalData[0].value).then(function() {
+                return new Promise(function(resolve) { setTimeout(resolve, 500); });
+            }).then(function() {
+                var idx = 0;
+                function runBatch() {
+                    var batch = [];
+                    while (batch.length < concurrency && idx < rest.length) {
+                        batch.push(sendOne(rest[idx].step, rest[idx].value));
+                        idx++;
+                    }
+                    if (batch.length === 0) {
+                        setStatus('发送完成。请打开 /state 查看处理后的信号图。');
+                        return;
+                    }
+                    return Promise.all(batch).then(runBatch);
+                }
+                return runBatch();
+            }).catch(function(e) {
+                setStatus('错误: ' + e);
+            });
+        };
+    </script>
+</body>
+</html>

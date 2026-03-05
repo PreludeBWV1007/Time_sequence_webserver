@@ -558,8 +558,17 @@ bool http_conn::process_write(HTTP_CODE ret) {
             double r = g_tick_state ? g_tick_state->getResult() : 0.0;
             std::string disp = g_tick_state ? g_tick_state->getDisplay() : "";
             char body_buf[8192];
-            const char* pre = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>State</title></head><body><p>step_id: %d</p><p>result: %f</p><pre>";
-            const char* suf = "</pre><p><a href='/state'>刷新</a></p></body></html>";
+            const char* pre = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>时序信号 · 状态</title><style>"
+                "*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f7;color:#1d1d1f;min-height:100vh}.page{max-width:960px;margin:0 auto;padding:32px 24px}.page h1{font-size:28px;font-weight:600;margin:0 0 8px;letter-spacing:-0.5px}.page .sub{font-size:14px;color:#86868b;margin:0 0 24px;line-height:1.5}.layout{display:flex;gap:24px;margin-top:8px}.main{flex:1;min-width:0}.card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.06)}#stateChart{max-width:100%;height:320px}#stateChartHint{font-size:13px;color:#86868b;margin:12px 0 0}.sidebar{width:280px;flex-shrink:0}.sidebar .card{padding:24px}.sidebar h3{margin:0 0 20px;font-size:15px;font-weight:600;color:#1d1d1f}.stat{margin:12px 0;font-size:13px}.label{color:#86868b;margin-right:6px}.val{font-weight:500;color:#1d1d1f}.btn{display:inline-block;margin-top:16px;padding:10px 20px;background:#0071e3;color:#fff;text-decoration:none;border-radius:10px;font-size:14px;font-weight:500;transition:background .2s}.btn:hover{background:#0077ed}.sidebar pre{font-size:11px;max-height:260px;overflow:auto;background:#f5f5f7;padding:12px;border-radius:8px;margin:16px 0 0;color:#1d1d1f}</style></head><body><div class=\"page\"><h1>处理后信号</h1><p class=\"sub\">按 step 顺序的处理结果，与发送端信号趋势一致。</p><div class=\"layout\"><main class=\"main\"><div class=\"card\"><canvas id=\"stateChart\" width=\"640\" height=\"320\"></canvas></div><p id=\"stateChartHint\"></p></main><aside class=\"sidebar\"><div class=\"card\"><h3>状态</h3><p class=\"stat\"><span class=\"label\">step_id</span><span class=\"val\">%d</span></p><p class=\"stat\"><span class=\"label\">result</span><span class=\"val\">%.6f</span></p><a href=\"/state\" class=\"btn\">刷新</a><pre id=\"stateDisplay\">";
+            const char* suf = "</pre></div></aside></div></div><script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script><script>"
+                "function drawStateChart(){var p=document.getElementById('stateDisplay');var hint=document.getElementById('stateChartHint');"
+                "if(!p){if(hint)hint.textContent='缺少 stateDisplay';return;}var raw=(p.innerText||p.textContent).trim();"
+                "var t=raw.split(String.fromCharCode(10));var s=[],v=[];for(var i=0;i<t.length;i++){var m=t[i].match(/^(\\d+):\\s*([\\d.-]+)/);if(m){s.push(parseInt(m[1]));v.push(parseFloat(m[2]));}}"
+                "if(s.length===0){if(hint)hint.textContent='暂无处理数据，请先发送信号';return;}if(hint)hint.textContent='';"
+                "var c=document.getElementById('stateChart').getContext('2d');if(typeof Chart==='undefined'){if(hint)hint.textContent='Chart.js 未加载';return;}"
+                "new Chart(c,{type:'line',data:{labels:s,datasets:[{label:'processed',data:v,borderColor:'#0071e3',fill:false,tension:0.1}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:false}}}});}"
+                "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){setTimeout(drawStateChart,50);});}else{setTimeout(drawStateChart,50);}"
+                "</script></body></html>";
             int n = snprintf( body_buf, sizeof(body_buf), pre, sid, r );
             if ( n > 0 && n < (int)sizeof(body_buf) ) {
                 size_t avail = sizeof(body_buf) - (size_t)n - strlen(suf) - 1;

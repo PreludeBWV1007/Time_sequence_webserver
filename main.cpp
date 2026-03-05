@@ -50,7 +50,7 @@ int main( int argc, char* argv[] ) {
     g_tick_queue = &tick_queue;
     g_tick_state = &tick_state;
     auto on_tick = [&tick_state](double /*old_result*/, const TickData& td) {
-        double processed = td.getValue() * 2.0;
+        double processed = td.getValue();
         if ( tick_state.update(td, processed) )
             tick_state.appendDisplay(td.getStepId(), processed);
     };
