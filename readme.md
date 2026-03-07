@@ -2,8 +2,12 @@
 
 基于 Linux `epoll` 的 Proactor 风格高并发 HTTP 服务器，配合线程池处理请求解析与响应组装；在此基础上集成了一套 **时序信号处理模块**（`TickQueue` / `TickState` / `singlethreadpool`），通过 HTTP 接口和前端页面，实现「多客户端乱序发送 → 服务端单线程按序处理 → 前后端可视化对比」的完整闭环。
 
-> - **项目结构图**：`![项目结构图](docs/framework1.JPG)`  `![项目结构图](docs/framework2.JPG)`  
-> - **前端演示图**：`![信号生成页面](docs/signal_transmit.png)`、`![信号接收页面](/docs/signal_receive.png)`  
+> - **项目结构图**：
+>   ![项目结构图](docs/framework1.JPG)
+>   ![项目结构图](docs/framework2.JPG)
+> - **前端演示图**：
+>   ![信号生成页面](docs/signal_transmit.png)
+>   ![信号接收页面](docs/signal_receive.png)  
 
 ---
 
@@ -159,8 +163,6 @@ make           # 生成 server 可执行文件
    - 等待短暂时间后，将 `step=1..100` 打乱顺序，按设定的并发度分批调用 `/tick?step=&value=`。
 5. 发送完成后，根据提示打开 `/state` 查看处理后的信号。
 
-> 预留截图位：`![信号生成页面](docs/signal-page.png)`
-
 ### 2. 在 `/state` 中查看处理后的信号
 
 访问：`http://127.0.0.1:8080/state`
@@ -172,8 +174,6 @@ make           # 生成 server 可执行文件
   - `step_id`：当前已处理的最大步序（理论上为 100）
   - `result`：`TickState` 中累积的 result（供 demo 使用）
   - 一个可滚动的文本框，用 `step: value` 的形式列出所有已处理的点。
-
-> 预留截图位：`![信号状态页面](docs/state-page.png)`
 
 ---
 
@@ -187,11 +187,15 @@ make           # 生成 server 可执行文件
 
 ---
 
-## 未来研究方向
+## 后续可以扩展的方向
 
 - 在 `on_tick` 中替换为**真实业务逻辑**（例如滤波、聚合、风控状态机等），利用当前的「严格按序消费」语义。
 - 在 `/state` 增加更多统计信息（如波动率、最大回撤等），或提供 `JSON` API 供前端自定义展示。
 - 将全局 `g_tick_*` 封装为一个「时序服务」类，支持多个不同的信号通道。
 
 ---
+
+## 许可证
+
+当前仓库未附带 LICENSE 文件，如需开源发布，请根据实际情况补充相应的协议。
 
