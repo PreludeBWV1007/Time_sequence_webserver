@@ -112,6 +112,8 @@
 ├── resources/             # 静态资源根目录（doc_root 指向此目录）
 │   ├── tick.html          # 简单客户端：单条 /tick?value=1.0
 │   └── signal.html        # 时序信号生成与并发发送（Chart.js 可视化）
+├── test_presure/          # 性能压测（Webbench）
+│   └── webbench-1.5/      # Webbench 1.5 源码，编译后对指定 URL 做 GET 压测
 ├── demo/                  # 时序模块的独立 demo（不走 HTTP）
 │   ├── main.cpp           # 多生产者压测 TickQueue（demo_tick）
 │   ├── main_sin.cpp       # sin 信号方案 A 验证（demo_sin）
@@ -177,6 +179,35 @@ make           # 生成 server 可执行文件
 
 ---
 
+## 性能测试
+
+在本地（WSL2 / Linux）单机环境下，使用项目内 **Webbench 1.5**（`test_presure/webbench-1.5/`）对服务器进行基准测试。测试条件：默认 8 工作线程、最大 10000 待处理请求、epoll ET + 非阻塞 I/O。
+
+### 测试方法
+
+```bash
+# 1. 编译 Webbench（仅需一次）
+cd test_presure/webbench-1.5 && make
+
+# 2. 启动服务
+./server 8080
+
+# 3. 在另一终端运行压测
+# -c 并发客户端数，-t 压测时长（秒）
+./test_presure/webbench-1.5/webbench -c 8 -t 30 http://127.0.0.1:8080/index.html
+```
+
+### 典型结果（参考）
+
+| 场景 | Speed (pages/min) | 请求数 (30s) | QPS | 吞吐 (bytes/sec) |
+|------|-------------------|--------------|-----|------------------|
+| GET /index.html，8 客户端，30s | ~139 万 | ~69.7 万成功，0 失败 | ~2.3 万 | ~370 万 |
+| GET /index.html，100 客户端，30s | ~137 万 | ~68.5 万成功，0 失败 | ~2.3 万 | ~363 万 |
+
+说明：Webbench 以多进程方式对同一 URL 持续发起 GET 请求；上述结果为本地单机实测，实际数值随机器配置与负载会有波动。可根据需要调整 `threadpool` 的线程数或 `max_requests` 以适配更高并发。
+
+---
+
 ## demo 目录：时序模块的独立验证
 
 `demo/` 目录下提供了不用 HTTP、直接在进程内验证时序模块正确性的示例，详细说明见 `demo/readme.md`，包括：
@@ -192,10 +223,4 @@ make           # 生成 server 可执行文件
 - 在 `on_tick` 中替换为**真实业务逻辑**（例如滤波、聚合、风控状态机等），利用当前的「严格按序消费」语义。
 - 在 `/state` 增加更多统计信息（如波动率、最大回撤等），或提供 `JSON` API 供前端自定义展示。
 - 将全局 `g_tick_*` 封装为一个「时序服务」类，支持多个不同的信号通道。
-
----
-
-## 许可证
-
-当前仓库未附带 LICENSE 文件，如需开源发布，请根据实际情况补充相应的协议。
 
