@@ -3,8 +3,8 @@
 基于 Linux `epoll` 的 Proactor 风格高并发 HTTP 服务器，配合线程池处理请求解析与响应组装；在此基础上集成了一套 **时序信号处理模块**（`TickQueue` / `TickState` / `singlethreadpool`），通过 HTTP 接口和前端页面，实现「多客户端乱序发送 → 服务端单线程按序处理 → 前后端可视化对比」的完整闭环。
 
 > - **项目结构图**：
->   ![项目结构图](docs/framework1.JPG)
->   ![项目结构图](docs/framework2.JPG)
+>   ![项目结构图](docs/structure_1.JPG)
+>   ![项目结构图](docs/structure_2.JPG)
 > - **前端演示图**：
 >   ![信号生成页面](docs/signal_transmit.png)
 >   ![信号接收页面](docs/signal_receive.png)  
